@@ -62,6 +62,13 @@ class SessionWithHeaderRedirection(requests.Session):
         password: Optional[str] = None,
     ) -> None:
         super().__init__()
+
+        proxies = {key.split('_')[0] : os.environ[key] 
+           for key in ["http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY"] 
+           if key in os.environ}
+
+        if len(proxies) > 0:
+            self.proxies.update(proxies)
         self.headers.update({"User-Agent": user_agent})
 
         if username and password:
@@ -235,7 +242,7 @@ class Auth(object):
             # This will avoid the use of the netrc after we are logged in
             session.trust_env = False
             session.headers.update(
-                {"Authorization": f'Bearer {self.token["access_token"]}'}
+                {"Authorization": f"Bearer {self.token['access_token']}"}
             )
         return session
 
