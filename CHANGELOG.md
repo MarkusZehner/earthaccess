@@ -7,6 +7,48 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+
+### Added
+
+- Added triaging guide ([#754](https://github.com/nsidc/earthaccess/issues/754))
+  ([@Sherwin-14](https://github.com/Sherwin-14))
+  ([@mfisher87](https://github.com/mfisher87))
+
+### Removed
+
+- Python 3.10 is no longer supported.
+  ([#966](https://github.com/nsidc/earthaccess/pull/966))
+  ([@weiji14](https://github.com/weiji14))
+
+### Added
+- Add notebook demonstrating workflow with TEMPO Level 3 data as a virtual dataset ([#924](https://github.com/nsidc/earthaccess/pull/924))
+([@danielfromearth](https://github.com/danielfromearth))
+- `get_s3_filesystem` now accepts an `endpoint` argument for specifying a credentials url.
+([#602](https://github.com/nsidc/earthaccess/issues/602))
+([@rwegener2](https://github.com/rwegener2))
+
+- s3 `download` now checks for existing files.
+([#807](https://github.com/nsidc/earthaccess/issues/807))
+([@Sherwin-14](https://github.com/Sherwin-14))
+
+
+### Changed
+
+- By default, _disable_ progress bars during downloading.
+  ([#612](https://github.com/nsidc/earthaccess/issues/612))
+  ([@Sherwin-14](https://github.com/Sherwin-14))
+
+- Updated bug and triage label names in bug Issue template.
+  ([#998](https://github.com/nsidc/earthaccess/pull/998))
+  ([@asteiker](https://github.com/asteiker))
+
+- `download` now raises `DownloadFailure` exception on failure.
+  ([#612](https://github.com/nsidc/earthaccess/issues/612))
+  ([@Sherwin-14](https://github.com/Sherwin-14))
+
+### Fixed
+- Corrected Harmony typo in notebooks/Demo.ipynb([#995](https://github.com/nsidc/earthaccess/issues/995))([stelios-c](https://github.com/stelios-c))
+
 ## [v0.14.0] - 2025-02-11
 
 ### Added
@@ -40,6 +82,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - `earthaccess.download` now shares the authenticated session cookie among threads to avoid overloading EDL.
   ([#913](https://github.com/nsidc/earthaccess/issues/913))
   ([**@hailiangzhang**](https://github.com/hailiangzhang))
+
 
 ## [v0.12.0] - 2024-11-13
 
