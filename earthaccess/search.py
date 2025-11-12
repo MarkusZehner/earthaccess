@@ -5,6 +5,7 @@ from inspect import getmembers, ismethod
 import requests
 from typing_extensions import (
     Any,
+    Iterable,
     List,
     Optional,
     Self,
@@ -61,9 +62,6 @@ class DataCollections(CollectionQuery):
             self.mode(auth.system.cmr_base_url)
 
         self._debug = False
-
-        self.params["has_granules"] = True
-        self.params["include_granule_counts"] = True
 
     @override
     def hits(self) -> int:
@@ -306,10 +304,10 @@ class DataCollections(CollectionQuery):
         if has_granules is not None and not isinstance(has_granules, bool):
             raise TypeError("has_granules must be of type bool or None")
 
-        if has_granules is None and "has_granules" in self.params:
-            del self.params["has_granules"]
-        else:
+        if has_granules is not None:
             self.params["has_granules"] = has_granules
+        elif "has_granules" in self.params:
+            del self.params["has_granules"]
 
         return self
 
@@ -360,7 +358,7 @@ class DataCollections(CollectionQuery):
         """An alias for the `daac` method.
 
         Parameters:
-            data_center_name: DAAC shortname, e.g. NSIDC, PODAAC, GESDISC
+            data_center_name: DAAC shortname, e.g. NSIDC, PODAAC, GES_DISC
 
         Returns:
             self
@@ -372,7 +370,7 @@ class DataCollections(CollectionQuery):
         for the DAAC.
 
         Parameters:
-            daac_short_name: a DAAC shortname, e.g. NSIDC, PODAAC, GESDISC
+            daac_short_name: a DAAC shortname, e.g. NSIDC, PODAAC, GES_DISC
 
         Returns:
             self
@@ -556,7 +554,7 @@ class DataGranules(GranuleQuery):
         """An alias for the `daac` method.
 
         Parameters:
-            data_center_name (String): DAAC shortname, e.g. NSIDC, PODAAC, GESDISC
+            data_center_name (String): DAAC shortname, e.g. NSIDC, PODAAC, GES_DISC
 
         Returns:
             self
@@ -568,7 +566,7 @@ class DataGranules(GranuleQuery):
         the DAAC.
 
         Parameters:
-            daac_short_name: a DAAC shortname, e.g. NSIDC, PODAAC, GESDISC
+            daac_short_name: a DAAC shortname, e.g. NSIDC, PODAAC, GES_DISC
 
         Returns:
             self
@@ -628,7 +626,7 @@ class DataGranules(GranuleQuery):
                 self.params["provider"] = provider
         return self
 
-    def granule_name(self, granule_name: str) -> Self:
+    def granule_name(self, granule_name: str | Iterable[str]) -> Self:
         """Find granules matching either granule ur or producer granule id,
         queries using the readable_granule_name metadata field.
 
@@ -643,10 +641,17 @@ class DataGranules(GranuleQuery):
             self
 
         Raises:
-            TypeError: if `granule_name` is not of type `str`
+            TypeError: if `granule_name` is not of type `str` or `Iterable[str]`.
         """
+        if not isinstance(granule_name, Iterable):
+            raise TypeError(
+                "granule_name must be of type string or Iterable of strings"
+            )
         if not isinstance(granule_name, str):
-            raise TypeError("granule_name must be of type string")
+            # Convert iterable to list of strings. Since str is also Iterable, make
+            # sure we don't do this when granule_name is a string, otherwise
+            # we would get a list of individual characters.
+            granule_name = [str(name) for name in granule_name]
 
         self.params["readable_granule_name"] = granule_name
         self.params["options[readable_granule_name][pattern]"] = True

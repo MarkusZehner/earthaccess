@@ -1,5 +1,6 @@
 # package imports
 import logging
+import os
 import unittest
 from unittest import mock
 
@@ -72,6 +73,17 @@ class TestCreateAuth(unittest.TestCase):
         auth.login(strategy="interactive")
         self.assertEqual(auth.authenticated, True)
         self.assertEqual(auth.password, "password")
+        self.assertEqual(auth.token, json_response)
+
+    @responses.activate
+    @mock.patch.dict(os.environ, {"EARTHDATA_TOKEN": "ABCDEFGHIJKLMNOPQ"})
+    def test_auth_can_parse_existing_user_token(self):
+        json_response = {"access_token": os.environ["EARTHDATA_TOKEN"]}
+
+        # Test
+        auth = Auth()
+        auth.login(strategy="environment")
+        self.assertEqual(auth.authenticated, True)
         self.assertEqual(auth.token, json_response)
 
     @responses.activate
