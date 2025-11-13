@@ -8,6 +8,7 @@ from pathlib import Path
 from pickle import dumps, loads
 from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
 from uuid import uuid4
+import io
 
 import fsspec
 import requests
@@ -651,7 +652,7 @@ class Store(object):
 
         return self._get(
             granules,
-            Path(local_path),
+            Path(local_path) if local_path != 'memfile' else None,
             provider,
             credentials_endpoint=credentials_endpoint,
             pqdm_kwargs=pqdm_kwargs,
@@ -749,6 +750,46 @@ class Store(object):
             return self._download_onprem_granules(
                 data_links, local_path, pqdm_kwargs=pqdm_kwargs
             )
+        
+    @_get.register
+    def _get_memfile_urls(
+        self,
+        granules: List[str],
+        local_path: None,
+        provider: Optional[str] = None,
+        *,
+        credentials_endpoint: Optional[str] = None,
+        pqdm_kwargs: Optional[Mapping[str, Any]] = None,
+    ) -> List[Path]:
+        data_links = granules
+        s3_fs = s3fs.S3FileSystem()
+        if (
+            provider is None
+            and credentials_endpoint is None
+            and self.in_region
+            and "cumulus" in data_links[0]
+        ):
+            raise ValueError(
+                "earthaccess can't yet guess the provider for cloud collections, "
+                "we need to use one from `earthaccess.list_cloud_providers()` or if known the S3 credential endpoint"
+            )
+        if self.in_region and data_links[0].startswith("s3"):
+            raise ValueError(
+                "memfile not tested for S3 files yet"
+            )
+
+        else:
+            pqdm_kwargs = {
+                "exception_behaviour": "immediate",
+                "disable": True,
+                **(pqdm_kwargs or {}),
+                # We don't want a user to be able to override the following kwargs,
+                # which is why they appear *after* spreading pqdm_kwargs above.
+                "argument_type": "args",
+            }
+            return self._download_onprem_granules_in_memory(
+                    data_links, pqdm_kwargs=pqdm_kwargs
+                )
 
     @_get.register
     def _get_granules(
@@ -885,6 +926,7 @@ class Store(object):
             raise ValueError(
                 "We need to be logged into NASA EDL in order to download data granules"
             )
+        
         directory.mkdir(parents=True, exist_ok=True)
 
         arguments = [(url, directory) for url in urls]
@@ -918,3 +960,75 @@ class Store(object):
                 "An exception occurred while trying to access remote files via HTTPS"
             )
             raise
+
+    @retry(
+        reraise=True,
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=10),
+        retry=retry_if_exception_type(Exception),
+    )
+    def _download_memory_file(self, url: str) -> bytes:
+        """Download a single file and return its bytes.
+
+        Parameters:
+            url: the granule url
+
+        Returns:
+            The file contents as bytes.
+        """
+        # If the get data link is an Opendap location
+        if "opendap" in url and url.endswith(".html"):
+            url = url.replace(".html", "")
+
+        # reuse the authenticated session in thread-local storage
+        original_session = self.get_requests_session()
+        self._clone_session_in_local_thread(original_session)
+        session = self.thread_locals.local_thread_session
+
+        # stream into memory
+        b = io.BytesIO()
+        with session.get(url, stream=True, allow_redirects=True) as r:
+            r.raise_for_status()
+            for chunk in r.iter_content(chunk_size=1024 * 1024):
+                if chunk:
+                    b.write(chunk)
+
+        return b.getvalue()
+
+    def _download_onprem_granules_in_memory(
+        self,
+        urls: List[str],
+        *,
+        pqdm_kwargs: Optional[Mapping[str, Any]] = None,
+    ) -> List[Any]:
+        """Downloads a list of URLS into the data directory.
+
+        Parameters:
+            urls: list of granule URLs from an on-prem collection
+            directory: local directory to store the downloaded files
+            pqdm_kwargs: Additional keyword arguments to pass to pqdm, a parallel processing library.
+                See pqdm documentation for available options. Default is to use immediate exception behavior
+                and the number of jobs specified by the `threads` parameter.
+
+        Returns:
+            A list of local filepaths to which the files were downloaded.
+        """
+        if urls is None:
+            raise ValueError("The granules didn't provide a valid GET DATA link")
+        if self.auth is None:
+            raise ValueError(
+                "We need to be logged into NASA EDL in order to download data granules"
+            )
+
+        arguments = [(url,) for url in urls]
+
+        pqdm_kwargs = {
+            "exception_behaviour": "immediate",
+            "disable": True,
+            **(pqdm_kwargs or {}),
+            # We don't want a user to be able to override the following kwargs,
+            # which is why they appear *after* spreading pqdm_kwargs above.
+            "argument_type": "args",
+        }
+
+        return pqdm(arguments, self._download_memory_file, **pqdm_kwargs)
