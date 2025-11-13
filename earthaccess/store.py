@@ -992,8 +992,8 @@ class Store(object):
             for chunk in r.iter_content(chunk_size=1024 * 1024):
                 if chunk:
                     b.write(chunk)
-
-        return b.getvalue()
+        b.seek(0)
+        return b
 
     def _download_onprem_granules_in_memory(
         self,
